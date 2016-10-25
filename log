@@ -1,0 +1,4 @@
+18th Aug 2016
+
+Methods tried : Grab cut, Normalized Cut, Graph Cut( Yuri Boykov)
+Results : Grab cut and Normalized Cut did not work well. Graph Cut(GC) gave good results after some parameter tuning with similarity function. Currently similarity is defined only on the basis of intensity value which gives bad results is several situations. There are a lot of outliers on considering only the intensity values since there is a lot of variation even on the same road.
