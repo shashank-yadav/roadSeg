@@ -7,9 +7,11 @@
 // #include <opencv2/core/core.hpp>
 // #include <opencv2/highgui/highgui.hpp>
 
-#define GAMMA 20
+#define GAMMA 22
+#define GAMMAT 22
 #define BINS 50
 #define BINSIZE 10
+#define FACTOR 1.2
 
 // typedef Graph<int,int,int> GraphType;
 typedef Graph<float,float,float> GraphType;
@@ -31,7 +33,7 @@ inline Point oneD_to_twoD(const int &p , const int &width )
     return Point(p%width , p/width);
 }
 
-inline Point2f getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
+float getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
 {
     static const float inv_sqrt_2pi = 0.3989422804014327;
     Vec3f I1 = Vec3f(Ib1);
@@ -45,7 +47,7 @@ inline Point2f getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
     float a = sqrt((I1-I2).dot(I1-I2))/GAMMA;
     // float weight = ( inv_sqrt_2pi * exp(-1*norm(I1-I2)/GAMMA) );
     float weight = inv_sqrt_2pi * exp(-0.5*a*a )/GAMMA ;
-    weight = (0.0001 + weight)/1.0001;
+    weight = (0.00001 + weight)/1.00001;
 
     // return Point2f( weight , (1 - weight) );
     // I1 = I1/(sqrt(I1.dot(I1)));
@@ -53,13 +55,13 @@ inline Point2f getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
     // float weight = (I1.dot(I2));
     // cout<<weight<<endl;
     
-    return 25*Point2f(weight , 1.0-weight);
+    return 30*weight;
 
 }
 
 
 
-float getWeightCL(const Vec3f meanCL[] , const Vec3b &Ib)
+float getWeightCL(Vec3f meanCL[] , Vec3b &Ib)
 {
     static const float inv_sqrt_2pi = 0.3989422804014327;
     
@@ -73,40 +75,43 @@ float getWeightCL(const Vec3f meanCL[] , const Vec3b &Ib)
 
     if ( meanCL[index][0] < 0 )
     {
-        Vec3f x1,x2;
-        vector<int> NonNegative;
+        // Vec3f x1,x2;
+        // vector<int> NonNegative;
 
-        for (int i = 0; i < BINS; ++i)
-        {
-            if( meanCL[i][0] > 0 )
-                NonNegative.push_back(i);
+        // for (int i = 0; i < BINS; ++i)
+        // {
+        //     if( meanCL[i][0] > 0 )
+        //         NonNegative.push_back(i);
             
-        }
+        // }
 
-        if (index > NonNegative[NonNegative.size() - 1])
-        {
-            x1 = meanCL[NonNegative[NonNegative.size() - 2]];
-            x2 = meanCL[NonNegative[NonNegative.size() - 1]];
-        }
-        else
-        {
-            x1 = meanCL[NonNegative[0]];
-            x2 = meanCL[NonNegative[1]];
+        // if (index > NonNegative[NonNegative.size() - 1])
+        // {
+        //     x1 = meanCL[NonNegative[NonNegative.size() - 2]];
+        //     x2 = meanCL[NonNegative[NonNegative.size() - 1]];
+        // }
+        // else
+        // {
+        //     x1 = meanCL[NonNegative[0]];
+        //     x2 = meanCL[NonNegative[1]];
 
-        }
+        // }
 
-        x = norm((x1-pixel).cross(x2-pixel))/norm(x1-x2);
+        // x = norm((x1-pixel).cross(x2-pixel))/norm(x1-x2);
         // cout<<" X : "<<x<<endl;
+
+        return 1e-10;
     }
     else
     {
-        x = norm(pixel - meanCL[index]);
+        Vec3f diff = pixel - meanCL[index]; 
+        x = diff.dot(diff);
     }
 
-    float weight = inv_sqrt_2pi * exp(-0.5*x*x/(GAMMA*GAMMA)) / GAMMA;
+    float weight = inv_sqrt_2pi * exp(-0.5*x/(GAMMAT*GAMMAT)) / GAMMAT;
     // cout<<"norm : : "<<norm(pixel - meanCL[index])<<endl;
     // cout<<"weight : : "<<weight<<endl;
-    weight = (0.0001 + weight)/1.0001;
+    weight = (0.00001 + weight)/1.00001;
     // cout<<weight<<endl;
 
     return weight;
@@ -238,20 +243,24 @@ int main(int argc, char** argv)
     for (int i = 1; i < width; ++i)
     {
         int n1, n2;
-        Point2f weight;
+        float weight;
         
         n1 = twoD_to_oneD(0,i,width);
         n2 = twoD_to_oneD(0,i-1,width);
 
         weight = getWeight( gray_image.at<Vec3b>(0,i) , gray_image.at<Vec3b>(0,i-1));
         
-        g->add_edge( n1 , n2 , weight.x , weight.x );
+        g->add_edge( n1 , n2 , weight , weight );
         
         // weight  = getWeightTerminals(gray_image.at<Vec3b>(0,i),mean);
         // weight  = getWeightCL( meanCL , varCL , gray_image.at<Vec3b>(0,i) );
         float w1 = getWeightCL( meanCL , gray_image.at<Vec3b>(0,i) );
         float w2 = getWeightCL( meanCLBkgrnd , gray_image.at<Vec3b>(0,i) );
-
+        if (roimap.at<Vec3b>(0,i) != road)
+        {
+            w1 /= FACTOR;
+            w2 *= FACTOR;
+        }
         g->add_tweights(n1 , w1  , w2);
     }
 
@@ -259,18 +268,24 @@ int main(int argc, char** argv)
     for (int j = 1; j < height; ++j)
     {
         int n1, n2 ;
-        Point2f weight;
+        float weight;
         n1 = twoD_to_oneD(j,0,width);
         n2 = twoD_to_oneD(j-1,0,width);
 
         // cout<<j<<endl;
         weight = getWeight( gray_image.at<Vec3b>(j,0) , gray_image.at<Vec3b>(j-1,0));
         
-        g->add_edge( n1 , n2 , weight.x , weight.x );
+        g->add_edge( n1 , n2 , weight , weight );
         
         // weight  = getWeightTerminals(gray_image.at<Vec3b>(j,0),mean);
         float w1 = getWeightCL( meanCL , gray_image.at<Vec3b>(j,0));
         float w2 = getWeightCL( meanCLBkgrnd , gray_image.at<Vec3b>(j,0));
+        if (roimap.at<Vec3b>(j,0) != road)
+        {
+            w1 /= FACTOR;
+            w2 *= FACTOR;
+        }
+    
         g->add_tweights(n1 , w1  , w2);
 
     }
@@ -283,24 +298,30 @@ int main(int argc, char** argv)
         {
             // cout << (int)gray_image.at<uchar>(j,i)<< "  ";
             int n1,n2 ;
-            Point2f weight;
+            float weight;
             n1 = twoD_to_oneD(j,i,width);
 
             // cout<<j<< "  " << i<< "  "<<n1<<endl; 
 
             n2 = twoD_to_oneD(j-1,i,width);
             weight = getWeight( gray_image.at<Vec3b>(j,i) , gray_image.at<Vec3b>(j-1,i)); 
-            g->add_edge( n1 , n2 , weight.x , weight.x );
+            g->add_edge( n1 , n2 , weight , weight );
         
 
             n2 = twoD_to_oneD(j,i-1,width);
             weight = getWeight( gray_image.at<Vec3b>(j,i) , gray_image.at<Vec3b>(j,i-1)); 
-            g->add_edge( n1 , n2 , weight.x , weight.x );
+            g->add_edge( n1 , n2 , weight , weight );
 
             // weight  = getWeightTerminals(gray_image.at<Vec3b>(j,i) , mean);
             float w1  = getWeightCL( meanCL ,  gray_image.at<Vec3b>(j,i) );
             float w2  = getWeightCL( meanCLBkgrnd ,  gray_image.at<Vec3b>(j,i) );
-            // cout<<weight<<endl;
+            
+            if (roimap.at<Vec3b>(j,i) != road)
+            {
+                w1 /= FACTOR;
+                w2 *= FACTOR;
+            }
+                // cout<<weight<<endl;
             g->add_tweights(n1 , w1 , w2);
             
         }
