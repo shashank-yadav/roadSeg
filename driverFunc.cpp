@@ -7,8 +7,8 @@
 // #include <opencv2/core/core.hpp>
 // #include <opencv2/highgui/highgui.hpp>
 
-#define GAMMA 22
-#define GAMMAT 22
+#define GAMMA 20
+#define GAMMAT 23
 #define BINS 50
 #define BINSIZE 10
 #define FACTOR 1.2
@@ -36,8 +36,24 @@ inline Point oneD_to_twoD(const int &p , const int &width )
 float getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
 {
     static const float inv_sqrt_2pi = 0.3989422804014327;
-    Vec3f I1 = Vec3f(Ib1);
-    Vec3f I2 = Vec3f(Ib2);
+
+    Mat temp(1,1,CV_8UC3);
+    Vec3b t1,t2;
+
+    temp.at<Vec3b> (0,0) = Ib1;
+    cvtColor(temp,temp,CV_RGB2HSV);
+    t1 = temp.at<Vec3b> (0,0);
+
+
+    temp.at<Vec3b> (0,0) = Ib2;
+    cvtColor(temp,temp,CV_RGB2HSV);
+    t2 = temp.at<Vec3b> (0,0);
+
+    Vec3f I1 = Vec3f(t1);
+    Vec3f I2 = Vec3f(t2);
+
+    // I1[2] = 0;
+    // I2[2] = 0;
 
     // I1 /= (I1[0] + I1[1] + I1[2]);
     // I2 /= (I2[0] + I2[1] + I2[2]);
@@ -55,7 +71,7 @@ float getWeight(const Vec3b &Ib1 , const Vec3b &Ib2 )
     // float weight = (I1.dot(I2));
     // cout<<weight<<endl;
     
-    return 30*weight;
+    return 15*weight;
 
 }
 
@@ -130,15 +146,9 @@ int main(int argc, char** argv)
     }
 
     Mat image , gray_image;
-
-    // VideoCapture cap(argv[1]); // open the default camera
-
-    
-    // if(!cap.isOpened())  // check if we succeeded
-    //     return -1;
-
     
     gray_image = imread(argv[1], CV_LOAD_IMAGE_COLOR);   // Read the file
+    // cvtColor(gray_image,gray_image,CV_RGB2HSV);
     // gray_image = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
 
     if(! gray_image.data )                              // Check for invalid input
@@ -218,7 +228,7 @@ int main(int argc, char** argv)
         // cout<<meanCL[i]<<endl; 
     }
     
-    Mat canvas = Mat::zeros(gray_image.rows, gray_image.cols*2+10, gray_image.type());
+    // Mat canvas = Mat::zeros(gray_image.rows, gray_image.cols*2+10, gray_image.type());
 
 
     // VideoWriter outputVideo("../segment1.avi", CV_FOURCC('X','V','I','D'), cap.get(CV_CAP_PROP_FPS), S, true);
@@ -230,7 +240,7 @@ int main(int argc, char** argv)
 {
 
     // cap >> gray_image;
-    gray_image.copyTo(canvas(Range::all(), Range(0, gray_image.cols)));
+    // gray_image.copyTo(canvas(Range::all(), Range(0, gray_image.cols)));
 
     GraphType *g = new GraphType(/*estimated # of nodes*/ NumNodes, /*estimated # of edges*/ 4*NumNodes); 
 
@@ -348,7 +358,7 @@ int main(int argc, char** argv)
             
         }
     }
-    imwrite( "data/segmentation_wi.jpg", gray_image );
+    imwrite( "data/segmentation_wi.png", gray_image );
 
     gray_image.copyTo(canvas(Range::all(), Range(gray_image.cols+10, gray_image.cols*2+10)));
     // outputVideoCombined << canvas;
